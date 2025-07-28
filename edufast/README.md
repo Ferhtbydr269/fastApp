@@ -169,12 +169,33 @@ After running `init_db.py`, you can use these test accounts:
 
 ## 🚀 Production Deployment
 
-1. **Update environment variables** for production
-2. **Configure CORS** properly in `main.py`
-3. **Use a production WSGI server** like Gunicorn:
+### Railway Deployment
+
+1. **Push to GitHub**:
    ```bash
-   pip install gunicorn
-   gunicorn app.main:app -w 4 -k uvicorn.workers.UvicornWorker
+   git init
+   git add .
+   git commit -m "Initial commit"
+   git branch -M main
+   git remote add origin YOUR_GITHUB_REPO_URL
+   git push -u origin main
+   ```
+
+2. **Deploy on Railway**:
+   - Go to [railway.app](https://railway.app)
+   - Connect your GitHub account
+   - Select your repository
+   - Add environment variables:
+     - `DATABASE_URL`: Your Supabase connection string
+     - `JWT_SECRET`: A secure random string
+   - Deploy automatically!
+
+3. **Environment Variables**:
+   ```
+   DATABASE_URL=postgresql://username:password@host:port/database
+   JWT_SECRET=your-super-secret-jwt-key-change-this-in-production
+   JWT_ALGORITHM=HS256
+   JWT_EXPIRATION_HOURS=24
    ```
 
 ## 🔒 Security Features
