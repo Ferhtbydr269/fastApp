@@ -17,8 +17,6 @@ class User(Base):
     phone = Column(String)
     avatar_url = Column(String)
     bio = Column(Text)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     last_login = Column(DateTime(timezone=True))
     is_active = Column(String, default="true")
     
@@ -44,8 +42,6 @@ class Course(Base):
     max_students = Column(Integer, default=50)
     category = Column(String)
     teacher_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     is_active = Column(String, default="true")
     
     __table_args__ = (

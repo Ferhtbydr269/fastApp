@@ -24,8 +24,6 @@ class UserUpdate(BaseModel):
 class UserResponse(UserBase):
     id: UUID
     avatar_url: Optional[str] = None
-    created_at: datetime
-    updated_at: datetime
     last_login: Optional[datetime] = None
     is_active: str
     
@@ -70,8 +68,6 @@ class CourseResponse(CourseBase):
     id: int
     teacher_id: UUID
     teacher: Optional[UserResponse] = None
-    created_at: datetime
-    updated_at: datetime
     is_active: str
     
     class Config:
