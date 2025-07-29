@@ -85,6 +85,86 @@ def get_course_students(
     
     return crud.get_course_enrollments(db, course_id)
 
+@router.put("/{course_id}", response_model=schemas.CourseResponse)
+def update_course(
+    course_id: int,
+    course_data: schemas.CourseUpdate,
+    db: Session = Depends(get_db),
+    current_teacher: models.User = Depends(get_current_teacher)
+):
+    """Update a course (teachers only)"""
+    course = crud.get_course(db, course_id)
+    if not course:
+        raise HTTPException(status_code=404, detail="Course not found")
+    
+    if course.teacher_id != current_teacher.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You can only update your own courses"
+        )
+    
+    # Update only provided fields
+    update_data = course_data.dict(exclude_unset=True)
+    
+    for field, value in update_data.items():
+        setattr(course, field, value)
+    
+    db.commit()
+    db.refresh(course)
+    return course
+
+@router.delete("/{course_id}")
+def delete_course(
+    course_id: int,
+    db: Session = Depends(get_db),
+    current_teacher: models.User = Depends(get_current_teacher)
+):
+    """Delete a course (teachers only)"""
+    course = crud.get_course(db, course_id)
+    if not course:
+        raise HTTPException(status_code=404, detail="Course not found")
+    
+    if course.teacher_id != current_teacher.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You can only delete your own courses"
+        )
+    
+    # Soft delete - mark as inactive
+    course.is_active = "false"
+    db.commit()
+    
+    return {"message": "Course deleted successfully"}
+
+@router.get("/search")
+def search_courses(
+    q: str = "",
+    category: str = None,
+    semester: str = None,
+    skip: int = 0,
+    limit: int = 20,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    """Search courses with filters"""
+    query = db.query(models.Course).filter(models.Course.is_active == "true")
+    
+    if q:
+        query = query.filter(
+            models.Course.title.ilike(f"%{q}%") | 
+            models.Course.description.ilike(f"%{q}%") |
+            models.Course.code.ilike(f"%{q}%")
+        )
+    
+    if category:
+        query = query.filter(models.Course.category == category)
+    
+    if semester:
+        query = query.filter(models.Course.semester == semester)
+    
+    courses = query.offset(skip).limit(limit).all()
+    return courses
+
 @router.get("/{course_id}/students/simple")
 def get_course_students_simple(
     course_id: int,

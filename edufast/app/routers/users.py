@@ -35,3 +35,42 @@ def login_user(user_credentials: schemas.UserLogin, db: Session = Depends(get_db
 def get_current_user_info(current_user: models.User = Depends(get_current_user)):
     """Get current user information"""
     return current_user
+
+@router.put("/profile", response_model=schemas.UserResponse)
+def update_profile(
+    profile_data: schemas.UserUpdate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    """Update user profile"""
+    # Update only provided fields
+    update_data = profile_data.dict(exclude_unset=True)
+    
+    for field, value in update_data.items():
+        setattr(current_user, field, value)
+    
+    db.commit()
+    db.refresh(current_user)
+    return current_user
+
+@router.post("/change-password")
+def change_password(
+    password_data: schemas.ChangePasswordRequest,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    """Change user password"""
+    from ..auth import verify_password, get_password_hash
+    
+    # Verify current password
+    if not verify_password(password_data.current_password, current_user.password):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Current password is incorrect"
+        )
+    
+    # Update password
+    current_user.password = get_password_hash(password_data.new_password)
+    db.commit()
+    
+    return {"message": "Password changed successfully"}

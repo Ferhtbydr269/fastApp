@@ -12,9 +12,19 @@ class User(Base):
     email = Column(String, unique=True, index=True, nullable=False)
     password = Column(String, nullable=False)
     role = Column(String, nullable=False)
+    first_name = Column(String)
+    last_name = Column(String)
+    phone = Column(String)
+    avatar_url = Column(String)
+    bio = Column(Text)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    last_login = Column(DateTime(timezone=True))
+    is_active = Column(String, default="true")
     
     __table_args__ = (
         CheckConstraint("role IN ('student', 'teacher')", name='check_role'),
+        CheckConstraint("is_active IN ('true', 'false')", name='check_is_active'),
     )
     
     # Relationships
@@ -27,8 +37,20 @@ class Course(Base):
     
     id = Column(Integer, primary_key=True, index=True)
     title = Column(String, nullable=False)
-    description = Column(String)
+    description = Column(Text)
+    code = Column(String, unique=True)
+    credits = Column(Integer, default=3)
+    semester = Column(String)
+    max_students = Column(Integer, default=50)
+    category = Column(String)
     teacher_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    is_active = Column(String, default="true")
+    
+    __table_args__ = (
+        CheckConstraint("is_active IN ('true', 'false')", name='check_course_active'),
+    )
     
     # Relationships
     teacher = relationship("User", back_populates="taught_courses")
@@ -107,3 +129,54 @@ class AttendanceRecord(Base):
     session = relationship("AttendanceSession", back_populates="attendance_records")
     student = relationship("User", foreign_keys=[student_id])
     marker = relationship("User", foreign_keys=[marked_by])
+
+class File(Base):
+    __tablename__ = "files"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    filename = Column(String, nullable=False)
+    original_filename = Column(String, nullable=False)
+    file_path = Column(String, nullable=False)
+    file_size = Column(Integer)
+    mime_type = Column(String)
+    file_type = Column(String)  # avatar, course_material, assignment, etc.
+    uploaded_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    course_id = Column(Integer, ForeignKey("courses.id"))
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    
+    # Relationships
+    uploader = relationship("User")
+    course = relationship("Course")
+
+class Message(Base):
+    __tablename__ = "messages"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    sender_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    recipient_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    subject = Column(String, nullable=False)
+    content = Column(Text, nullable=False)
+    is_read = Column(String, default="false")
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    
+    __table_args__ = (
+        CheckConstraint("is_read IN ('true', 'false')", name='check_message_read'),
+    )
+    
+    # Relationships
+    sender = relationship("User", foreign_keys=[sender_id])
+    recipient = relationship("User", foreign_keys=[recipient_id])
+
+class Announcement(Base):
+    __tablename__ = "announcements"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    course_id = Column(Integer, ForeignKey("courses.id"), nullable=False)
+    title = Column(String, nullable=False)
+    content = Column(Text, nullable=False)
+    created_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    
+    # Relationships
+    course = relationship("Course")
+    creator = relationship("User")

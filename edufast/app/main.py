@@ -1,10 +1,12 @@
 from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
+import os
 
 from .database import engine, get_db
 from . import models
-from .routers import users, courses, grades, attendance
+from .routers import users, courses, grades, attendance, files, messages
 
 # Create database tables with error handling
 try:
@@ -36,6 +38,13 @@ app.include_router(users.router)
 app.include_router(courses.router)
 app.include_router(grades.router)
 app.include_router(attendance.router)
+app.include_router(files.router)
+app.include_router(messages.router)
+
+# Mount static files for file uploads
+if not os.path.exists("uploads"):
+    os.makedirs("uploads")
+app.mount("/files", StaticFiles(directory="uploads"), name="files")
 
 @app.get("/")
 def read_root():
