@@ -266,22 +266,159 @@ def get_course_sessions(
     
     return sessions
 
+@router.get("/my-active-sessions")
+def get_my_active_sessions(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Get all active attendance sessions for current student"""
+    if current_user.role != "student":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only students can access this endpoint"
+        )
+    
+    # Get all courses the student is enrolled in
+    enrolled_courses = db.query(Course).join(Enrollment).filter(
+        Enrollment.student_id == current_user.id
+    ).all()
+    
+    active_sessions = []
+    for course in enrolled_courses:
+        # Get active sessions for this course
+        sessions = db.query(AttendanceSession).filter(
+            and_(
+                AttendanceSession.course_id == course.id,
+                AttendanceSession.status == "active"
+            )
+        ).all()
+        
+        for session in sessions:
+            # Check if student already marked attendance
+            existing_record = db.query(AttendanceRecord).filter(
+                and_(
+                    AttendanceRecord.session_id == session.id,
+                    AttendanceRecord.student_id == current_user.id
+                )
+            ).first()
+            
+            active_sessions.append({
+                "session_id": session.id,
+                "course_id": course.id,
+                "course_title": course.title,
+                "date": session.date.isoformat(),
+                "start_time": session.start_time.strftime("%H:%M"),
+                "end_time": session.end_time.strftime("%H:%M"),
+                "notes": session.notes,
+                "already_marked": existing_record is not None,
+                "attendance_status": existing_record.status if existing_record else None
+            })
+    
+    return {
+        "student_id": str(current_user.id),
+        "student_email": current_user.email,
+        "active_sessions": active_sessions
+    }
+
+@router.post("/self-mark/{session_id}")
+def mark_self_attendance(
+    session_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Allow student to mark their own attendance (if enabled)"""
+    if current_user.role != "student":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only students can mark their own attendance"
+        )
+    
+    # Check if session exists and is active
+    session = db.query(AttendanceSession).filter(AttendanceSession.id == session_id).first()
+    if not session:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Attendance session not found"
+        )
+    
+    if session.status != "active":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot mark attendance for closed session"
+        )
+    
+    # Check if student is enrolled in the course
+    enrollment = db.query(Enrollment).filter(
+        and_(
+            Enrollment.student_id == current_user.id,
+            Enrollment.course_id == session.course_id
+        )
+    ).first()
+    
+    if not enrollment:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="You are not enrolled in this course"
+        )
+    
+    # Check if attendance already marked
+    existing_record = db.query(AttendanceRecord).filter(
+        and_(
+            AttendanceRecord.session_id == session_id,
+            AttendanceRecord.student_id == current_user.id
+        )
+    ).first()
+    
+    if existing_record:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Attendance already marked for this session"
+        )
+    
+    # Create attendance record (only allow 'present' for self-marking)
+    db_record = AttendanceRecord(
+        session_id=session_id,
+        student_id=current_user.id,
+        status="present",  # Students can only mark themselves as present
+        marked_by=current_user.id  # Self-marked
+    )
+    
+    db.add(db_record)
+    db.commit()
+    db.refresh(db_record)
+    
+    return {
+        "message": "Attendance marked successfully",
+        "session_id": session_id,
+        "status": "present",
+        "marked_at": db_record.marked_at.isoformat()
+    }
+
 @router.get("/student/{student_id}")
 def get_student_attendance_history(
-    student_id: UUID,
+    student_id: str,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
     """Get complete attendance history for a student across all courses"""
+    # Convert string to UUID
+    try:
+        student_uuid = UUID(student_id)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid student ID format: {student_id}"
+        )
+    
     # Check permissions - students can only view their own, teachers can view any
-    if current_user.role == "student" and current_user.id != student_id:
+    if current_user.role == "student" and current_user.id != student_uuid:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Students can only view their own attendance history"
         )
     
     # Get student info
-    student = db.query(User).filter(User.id == student_id).first()
+    student = db.query(User).filter(User.id == student_uuid).first()
     if not student:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -291,11 +428,11 @@ def get_student_attendance_history(
     if student.role != "student":
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="User is not a student"
+            detail=f"User with ID {student_id} is a {student.role}, not a student"
         )
     
     # Get all enrollments for the student
-    enrollments = db.query(Enrollment).filter(Enrollment.student_id == student_id).all()
+    enrollments = db.query(Enrollment).filter(Enrollment.student_id == student_uuid).all()
     
     attendance_by_course = []
     
@@ -309,7 +446,7 @@ def get_student_attendance_history(
         # Get attendance records for this course
         records = db.query(AttendanceRecord).join(AttendanceSession).filter(
             and_(
-                AttendanceRecord.student_id == student_id,
+                AttendanceRecord.student_id == student_uuid,
                 AttendanceSession.course_id == course.id
             )
         ).order_by(AttendanceSession.date.desc()).all()
@@ -363,7 +500,7 @@ def get_student_attendance_history(
     overall_attendance_rate = (total_attended_all / total_sessions_all * 100) if total_sessions_all > 0 else 0
     
     return {
-        "student_id": str(student_id),
+        "student_id": str(student_uuid),
         "student_email": student.email,
         "overall_statistics": {
             "total_courses": len(attendance_by_course),

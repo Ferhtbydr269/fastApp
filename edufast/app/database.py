@@ -8,19 +8,19 @@ load_dotenv()
 # Supabase PostgreSQL bağlantısı
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres.jqukwkywcocypdjbbbze:Jawdropping.269@aws-0-us-east-2.pooler.supabase.com:5432/postgres")
 
-# Engine oluştur - connection pool ve timeout ayarları ile
+# Engine oluştur - optimized settings for Supabase
 engine = create_engine(
     DATABASE_URL,
-    pool_size=3,
-    max_overflow=5,
+    pool_size=5,
+    max_overflow=10,
     pool_pre_ping=True,
-    pool_recycle=1800,
+    pool_recycle=300,
     connect_args={
         "connect_timeout": 30,
         "application_name": "edufast_api",
-        "options": "-c statement_timeout=30000"
+        "sslmode": "require"
     },
-    echo=False  # SQL loglarını kapatır
+    echo=False
 )
 
 # Session factory
