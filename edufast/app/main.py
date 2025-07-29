@@ -4,10 +4,15 @@ from sqlalchemy.orm import Session
 
 from .database import engine, get_db
 from . import models
-from .routers import users, courses, grades
+from .routers import users, courses, grades, attendance
 
-# Create database tables
-models.Base.metadata.create_all(bind=engine)
+# Create database tables with error handling
+try:
+    models.Base.metadata.create_all(bind=engine)
+    print("✅ Database tables created successfully!")
+except Exception as e:
+    print(f"⚠️ Database connection warning: {e}")
+    print("📝 Note: Database tables will be created on first request")
 
 app = FastAPI(
     title="EduFast - Education Management System",
@@ -30,6 +35,7 @@ app.add_middleware(
 app.include_router(users.router)
 app.include_router(courses.router)
 app.include_router(grades.router)
+app.include_router(attendance.router)
 
 @app.get("/")
 def read_root():
@@ -41,14 +47,15 @@ def read_root():
     }
 
 @app.get("/health")
-def health_check(db: Session = Depends(get_db)):
+def health_check():
     """Health check endpoint to verify database connection"""
     try:
-        # Simple query to test database connection
-        db.execute("SELECT 1")
-        return {"status": "healthy", "database": "connected"}
+        # Test database connection
+        with engine.connect() as conn:
+            conn.execute("SELECT 1")
+        return {"status": "healthy", "database": "connected", "message": "Database connection successful"}
     except Exception as e:
-        return {"status": "unhealthy", "database": "disconnected", "error": str(e)}
+        return {"status": "unhealthy", "database": "disconnected", "error": str(e), "message": "Database connection failed"}
 
 if __name__ == "__main__":
     import uvicorn

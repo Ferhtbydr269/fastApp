@@ -1,6 +1,6 @@
 from pydantic import BaseModel, EmailStr
 from typing import Literal, Optional, List
-from datetime import datetime
+from datetime import datetime, date, time
 from uuid import UUID
 
 # User schemas
@@ -70,3 +70,59 @@ class GradeResponse(BaseModel):
     
     class Config:
         from_attributes = True
+
+# Attendance schemas
+class AttendanceSessionCreate(BaseModel):
+    date: date
+    start_time: time
+    end_time: time
+    notes: Optional[str] = None
+
+class AttendanceSessionResponse(BaseModel):
+    id: int
+    course_id: int
+    date: date
+    start_time: time
+    end_time: time
+    notes: Optional[str] = None
+    status: str
+    created_by: UUID
+    created_at: datetime
+    closed_at: Optional[datetime] = None
+    closed_by: Optional[UUID] = None
+    
+    class Config:
+        from_attributes = True
+
+class AttendanceRecordCreate(BaseModel):
+    student_id: UUID
+    status: Literal["present", "absent", "late", "excused"]
+
+class AttendanceRecordUpdate(BaseModel):
+    status: Literal["present", "absent", "late", "excused"]
+
+class AttendanceRecordResponse(BaseModel):
+    id: int
+    session_id: int
+    student_id: UUID
+    status: str
+    marked_at: datetime
+    marked_by: UUID
+    updated_at: datetime
+    student: Optional[UserResponse] = None
+    
+    class Config:
+        from_attributes = True
+
+class AttendanceStatusResponse(BaseModel):
+    session: AttendanceSessionResponse
+    attendance: List[AttendanceRecordResponse]
+    summary: dict
+
+class AttendanceReportResponse(BaseModel):
+    course_id: int
+    course_title: str
+    total_sessions: int
+    attendance_rate: float
+    student_reports: List[dict]
+    session_reports: List[dict]

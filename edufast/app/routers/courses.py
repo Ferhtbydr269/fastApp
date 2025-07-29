@@ -84,3 +84,48 @@ def get_course_students(
         )
     
     return crud.get_course_enrollments(db, course_id)
+
+@router.get("/{course_id}/students/simple")
+def get_course_students_simple(
+    course_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    """Get simple list of students enrolled in a course"""
+    # Check if course exists
+    course = crud.get_course(db, course_id)
+    if not course:
+        raise HTTPException(status_code=404, detail="Course not found")
+    
+    # Check permissions
+    if current_user.role == "teacher" and course.teacher_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You can only view students for your own courses"
+        )
+    elif current_user.role == "student":
+        # Check if student is enrolled
+        enrollment = db.query(models.Enrollment).filter(
+            models.Enrollment.student_id == current_user.id,
+            models.Enrollment.course_id == course_id
+        ).first()
+        if not enrollment:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You are not enrolled in this course"
+            )
+    
+    # Get enrolled students
+    students = db.query(models.User).join(models.Enrollment).filter(
+        models.Enrollment.course_id == course_id,
+        models.User.role == "student"
+    ).all()
+    
+    return [
+        {
+            "id": str(student.id),
+            "email": student.email,
+            "role": student.role
+        }
+        for student in students
+    ]

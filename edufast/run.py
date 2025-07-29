@@ -14,8 +14,8 @@ if __name__ == "__main__":
     
     uvicorn.run(
         "app.main:app",
-        host="0.0.0.0",  # Listen on all interfaces for Railway
+        host="127.0.0.1",  # Use localhost for Windows development
         port=port,
-        reload=False,  # Disable auto-reload for production
+        reload=True,  # Enable auto-reload for development
         log_level="info"
     )

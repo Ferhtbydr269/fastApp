@@ -11,14 +11,16 @@ DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres.jqukwkywcocypdjb
 # Engine oluştur - connection pool ve timeout ayarları ile
 engine = create_engine(
     DATABASE_URL,
-    pool_size=5,
-    max_overflow=10,
+    pool_size=3,
+    max_overflow=5,
     pool_pre_ping=True,
-    pool_recycle=300,
+    pool_recycle=1800,
     connect_args={
-        "connect_timeout": 10,
-        "application_name": "edufast_api"
-    }
+        "connect_timeout": 30,
+        "application_name": "edufast_api",
+        "options": "-c statement_timeout=30000"
+    },
+    echo=False  # SQL loglarını kapatır
 )
 
 # Session factory
