@@ -6,7 +6,9 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Supabase PostgreSQL bağlantısı
-DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres.jqukwkywcocypdjbbbze:Jawdropping.269@aws-0-us-east-2.pooler.supabase.com:5432/postgres")
+DATABASE_URL = os.getenv("DATABASE_URL")
+if not DATABASE_URL:
+    raise RuntimeError("DATABASE_URL ortam değişkeni tanımlı değil (.env.example dosyasına bakın)")
 
 # Engine oluştur - connection pool ve timeout ayarları ile
 engine = create_engine(
